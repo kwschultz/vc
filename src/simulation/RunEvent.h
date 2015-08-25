@@ -28,32 +28,42 @@
  Starts with an initial failed element and propagates the failure
  throughout the system using static and dynamic failure functions.
  */
-class RunEvent : public SimPlugin {
-    private:
-        quakelib::ElementIDSet  local_failed_elements;
-        BlockIDProcMapping      global_failed_elements;
-        quakelib::ElementIDSet  loose_elements;
-        unsigned int            sweep_num;
-        //
-        void processBlocksOrigFail(Simulation *sim, quakelib::ModelSweeps &sweeps);
-        void processBlocksSecondaryFailures(Simulation *sim, quakelib::ModelSweeps &sweeps);
-        virtual void markBlocks2Fail(Simulation *sim, const FaultID &trigger_fault);
-        void recordEventStresses(Simulation *sim);
-
-        void processStaticFailure(Simulation *sim);
-        void processAftershock(Simulation *sim);
-
-    public:
-        virtual std::string name() const {
-            return "Propagate event ruptures";
-        };
-        virtual void initDesc(const SimFramework *_sim) const {};
-        virtual bool needsTimer(void) const {
-            return true;
-        };
-        virtual SimRequest run(SimFramework *_sim);
+ 
+ 
+enum SpecExecStage {
+	NORMAL_OPERATION,
+	LOCALIZED_FAILURE,
+	CHECK_IF_SELF_FAILED,
+	CHECK_SELF_IGNORE,
+	REWIND_ALL
 };
 
-void solve_it(int n, double *x, double *A, double *b);
+typedef std::map<BlockID, unsigned int> FailureCount;
 
+class RunEvent : public SimPlugin {
+private:
+	quakelib::ElementIDSet	blocks2fail;
+	std::vector<int>        succ_sweep_sizes, fail_sweep_sizes;
+	FailureCount            num_failures;
+	
+	void processBlocksOrigFrictionLaw(Simulation *sim, quakelib::ModelSweeps &sweeps);
+	void processBlocksNewFrictionLaw(Simulation *sim, quakelib::ModelSweeps &sweeps);
+    virtual void markBlocks2Fail(Simulation *sim, const FaultID &trigger_fault, quakelib::ModelSweeps &sweeps);
+    void recordEventStresses(Simulation *sim);
+	
+public:
+    virtual std::string name() const { return "Propagate event ruptures"; };
+	virtual void initDesc(const SimFramework *_sim) const {};
+    virtual void finish(SimFramework *_sim);
+	virtual bool needsTimer(void) const { return true; };
+	virtual SimRequest run(SimFramework *_sim);
+}; 
+
+//  ===== NEED TO BE IMPLEMENTED ===================
+//    quakelib::ElementIDSet  local_failed_elements;
+//    BlockIDProcMapping      global_failed_elements;
+//    unsigned int            sweep_num;
+//    void processStaticFailure(Simulation *sim);
+//    void processAftershock(Simulation *sim); 
+ 
 #endif
