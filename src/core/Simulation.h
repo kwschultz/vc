@@ -114,7 +114,6 @@ class Simulation : public SimFramework, public VCParams, public VCSimData, publi
             greenShear()->allocateRow(row);
         };
 
-        void determineBlockNeighbors(void);
         void computeCFFs(void);
         void calcCFF(const BlockID gid);
         void matrixVectorMultiplyAccum(double *c, const quakelib::DenseMatrix<GREEN_VAL> *a, const double *b, const bool dense);
@@ -125,7 +124,6 @@ class Simulation : public SimFramework, public VCParams, public VCSimData, publi
         void distributeBlocks(const quakelib::ElementIDSet &local_id_list, BlockIDProcMapping &global_id_list);
         void collectEventSweep(quakelib::ModelSweeps &sweeps);
 
-        std::pair<quakelib::ElementIDSet::const_iterator, quakelib::ElementIDSet::const_iterator> getNeighbors(const BlockID &bid) const;
         void printTimers(void);
 
         bool isLocalBlockID(const BlockID &block_id) const {
@@ -293,8 +291,6 @@ class Simulation : public SimFramework, public VCParams, public VCSimData, publi
         //! Number of stress records written to files, used for keeping track of indices
         unsigned int        num_stress_recs;
 
-        //! Map of which blocks have which neighbors
-        std::map<BlockID, quakelib::ElementIDSet>   neighbor_map;
 };
 
 #endif

@@ -64,6 +64,4 @@ void VCInitBlocks::init(SimFramework *_sim) {
     // Set the starting year of the simulation
     sim->setYear(sim->getSimStart());
 
-    // Determine neighbors of blocks
-    sim->determineBlockNeighbors();
 }
