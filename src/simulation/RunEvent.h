@@ -24,12 +24,6 @@
 #ifndef _RUN_EVENT_H_
 #define _RUN_EVENT_H_
 
-/*!
- Starts with an initial failed element and propagates the failure
- throughout the system using static and dynamic failure functions.
- */
- 
- 
 enum SpecExecStage {
 	NORMAL_OPERATION,
 	LOCALIZED_FAILURE,
@@ -40,30 +34,30 @@ enum SpecExecStage {
 
 typedef std::map<BlockID, unsigned int> FailureCount;
 
+/*!
+ Starts with an initial failed element and propagates the failure
+ throughout the system using static and dynamic failure functions.
+ */
 class RunEvent : public SimPlugin {
 private:
-	quakelib::ElementIDSet	blocks2fail;
-	std::vector<int>        succ_sweep_sizes, fail_sweep_sizes;
 	FailureCount            num_failures;
+    unsigned int            sweep_num;
+    quakelib::ElementIDSet  local_failed_elements;
+    BlockIDProcMapping      global_failed_elements;
 	
-	void processBlocksOrigFrictionLaw(Simulation *sim, quakelib::ModelSweeps &sweeps);
-	void processBlocksNewFrictionLaw(Simulation *sim, quakelib::ModelSweeps &sweeps);
-    virtual void markBlocks2Fail(Simulation *sim, const FaultID &trigger_fault, quakelib::ModelSweeps &sweeps);
+	void processFailedBlocks(Simulation *sim, quakelib::ModelSweeps &sweeps);
+    virtual void markBlocks2Fail(Simulation *sim, const FaultID &trigger_fault);
     void recordEventStresses(Simulation *sim);
+    
+    void processStaticFailure(Simulation *sim);
+    void processAftershock(Simulation *sim);
 	
 public:
     virtual std::string name() const { return "Propagate event ruptures"; };
 	virtual void initDesc(const SimFramework *_sim) const {};
-    virtual void finish(SimFramework *_sim);
 	virtual bool needsTimer(void) const { return true; };
 	virtual SimRequest run(SimFramework *_sim);
 }; 
 
-//  ===== NEED TO BE IMPLEMENTED ===================
-//    quakelib::ElementIDSet  local_failed_elements;
-//    BlockIDProcMapping      global_failed_elements;
-//    unsigned int            sweep_num;
-//    void processStaticFailure(Simulation *sim);
-//    void processAftershock(Simulation *sim); 
  
 #endif
