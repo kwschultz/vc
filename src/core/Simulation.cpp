@@ -250,6 +250,38 @@ void Simulation::printTimers(void) {
     if (!dry_run) printAllTimers(console(), world_size, node_rank, ROOT_NODE_RANK);
 }
 
+void Simulation::determineBlockNeighbors(void) {
+    BlockList::iterator     bit, iit;
+    quakelib::ElementIDSet  all_sweeps;
+    double                  block_size;
+
+    for (bit=begin(); bit!=end(); ++bit) {
+        for (iit=begin(); iit!=end(); ++iit) {
+            block_size  = floor(bit->largest_dimension() * 1e-3) * 1e3;
+
+            if (bit->getBlockID() != iit->getBlockID() &&           // ensure blocks are not the same
+                bit->getFaultID() == iit->getFaultID() &&           // ensure blocks are on the same fault
+                bit->center().dist(iit->center()) < block_size * 2.0) { // ensure blocks are "nearby" each other
+                neighbor_map[bit->getBlockID()].insert(iit->getBlockID());
+                neighbor_map[iit->getBlockID()].insert(bit->getBlockID());
+            }
+        }
+    }
+}
+
+std::pair<quakelib::ElementIDSet::const_iterator, quakelib::ElementIDSet::const_iterator> Simulation::getNeighbors(const BlockID &bid) const {
+    std::map<BlockID, quakelib::ElementIDSet>::const_iterator       it;
+    quakelib::ElementIDSet      empty_set;
+
+    it = neighbor_map.find(bid);
+
+    if (it != neighbor_map.end()) {
+        return std::make_pair(it->second.begin(), it->second.end());
+    } else {
+        return std::make_pair(empty_set.end(), empty_set.end());
+    }
+}
+
 /*!
  Computes CFF values for all blocks on this node.
  */
