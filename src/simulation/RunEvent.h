@@ -44,6 +44,7 @@ private:
     unsigned int            sweep_num;
     quakelib::ElementIDSet  local_failed_elements;
     BlockIDProcMapping      global_failed_elements;
+    quakelib::ElementIDSet  loose_elements;
 	
 	void processFailedBlocks(Simulation *sim, quakelib::ModelSweeps &sweeps);
     virtual void markBlocks2Fail(Simulation *sim, const FaultID &trigger_fault);
