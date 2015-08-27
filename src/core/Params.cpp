@@ -111,6 +111,20 @@ void VCParams::read_params(const std::string &param_file_name) {
     // Kasey: parameter to either read in stress drops from file or compute them
     params.readSet<bool>("sim.friction.compute_stress_drops", true);
 
+    // schultz:
+    // Parse the speculative execution method string
+    std::string spec_exec_str = params.readSet<string>("sim.system.spec_exec", "none");
+	if (!spec_exec_str.compare("none")) {
+		spec_exec_method = SPEC_EXEC_NONE;
+	} else if (!spec_exec_str.compare("fixed")) {
+		spec_exec_method = SPEC_EXEC_FIXED_DIST;
+	} else if (!spec_exec_str.compare("adaptive")) {
+		spec_exec_method = SPEC_EXEC_ADAPTIVE;
+	} else {
+		spec_exec_method = SPEC_EXEC_UNDEFINED;
+	}
+
+
 }
 
 void VCParams::write_params(const std::string &param_file_name) {

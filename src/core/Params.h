@@ -35,6 +35,13 @@ enum GreensCalcMethod {
     GREENS_CALC_STANDARD        // use the new Okada class to calculate Greens functions
 };
 
+enum SpecExecMethod {
+	SPEC_EXEC_UNDEFINED,		// undefined behavior
+	SPEC_EXEC_NONE,				// do not use speculative execution
+	SPEC_EXEC_FIXED_DIST,		// use speculative execution with fixed boundary distance
+	SPEC_EXEC_ADAPTIVE			// use speculative execution with adaptive prediction
+};
+
 /*!
  The set of possible parameters for a VC simulation.
  These are described in detail in the example/sample_params.d file.
@@ -42,6 +49,8 @@ enum GreensCalcMethod {
 class VCParams {
     private:
         ConfigFile          params;
+        SpecExecMethod		spec_exec_method;
+        double				spec_exec_dist;
 
     public:
         VCParams(void) {};
@@ -192,6 +201,10 @@ class VCParams {
         bool computeStressDrops(void) const {
             return params.read<bool>("sim.friction.compute_stress_drops");
         };
+        
+        // schultz: speculative execution from Sachs' VC
+        SpecExecMethod getSpecExecMethod(void) const { return spec_exec_method; };
+        double getSpecExecDistance(void) const { return spec_exec_dist; };
 
         //
         // yoder: and overload so we can easily distinguish (off)diagonal elements (defined in GreensInit.cpp)

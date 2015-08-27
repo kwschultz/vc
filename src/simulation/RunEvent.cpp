@@ -66,12 +66,12 @@ void RunEvent::processFailedBlocks(Simulation *sim, quakelib::ModelSweeps &sweep
             // calculate the drop in stress from the failure
 
             // Heien method: 
-            //stress_drop = sim->getCFF0(gid) - sim->getCFF(gid);
+            stress_drop = sim->getCFF0(gid) - sim->getCFF(gid);
             // If this is the initial failure, use the stress drop
-            //if (!stress_drop) stress_drop = sim->getStressDrop(gid) - sim->getCFF(gid);
+            if (!stress_drop) stress_drop = sim->getStressDrop(gid) - sim->getCFF(gid);
 
             // Sachs method:
-            stress_drop = sim->getStressDrop(gid) - sim->getCFF(gid);
+            //stress_drop = sim->getStressDrop(gid) - sim->getCFF(gid);
 
             // Slip is in m
             slip = (stress_drop/sim->getSelfStresses(gid));
