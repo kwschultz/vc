@@ -89,6 +89,7 @@ void RunEvent::processFailedBlocks(Simulation *sim, quakelib::ModelSweeps &sweep
                                    sim->getShearStress(gid),
                                    sim->getNormalStress(gid));
 
+            // Add the slip from this failure to the current slip deficit
             sim->setSlipDeficit(gid, sim->getSlipDeficit(gid)+slip);
         }
     }
@@ -226,9 +227,6 @@ void RunEvent::processStaticFailure(Simulation *sim) {
     trigger_fault = sim->getBlock(triggerID).getFaultID();
     sweep_num = 0;
     
-    // schultz: Sachs' uses speculative execution (SpecExec.cpp) to guess whether the rupture will be local to one processor or distributed.
-    // Here I am assuming that Heien's global/local scoping handles this.
-    
     // Clear the list of failed blocks, and add the trigger block
     local_failed_elements.clear();
     num_failures.clear();
@@ -270,11 +268,15 @@ void RunEvent::processStaticFailure(Simulation *sim) {
             BlockID gid = it->getBlockID();
             sim->setShearStress(gid, 0.0);
             sim->setNormalStress(gid, sim->getRhogd(gid));
-            sim->setUpdateField(gid, (sim->getFailed(gid) ? 0 : std::isnan(sim->getSlipDeficit(gid)) ? 0 :sim->getSlipDeficit(gid) )); // ... also check for nan values
+            //sim->setUpdateField(gid, (sim->getFailed(gid) ? 0 : std::isnan(sim->getSlipDeficit(gid)) ? 0 :sim->getSlipDeficit(gid) )); // ... also check for nan values
             //sim->setUpdateField(gid, (sim->getFailed(gid) ? 0 : sim->getSlipDeficit(gid)));
+            ////////////////
+            // Schultz: Cannot reset the slip of failed blocks to zero, you are undoing the slip that occurred in 
+            //          ProcessFailedBlocks. ProcessFailedBlocks does our slip counting and we must use those results.
+            sim->setUpdateField(gid, sim->getSlipDeficit(gid));
         }
 
-        // Distribute the update field values to other processors
+        // Distribute the update field values (here it is slip from the sweep) to other processors
         // (possible) MPI operations:
         //sim->barrier();    // yoder: (debug)
         sim->distributeUpdateField();
