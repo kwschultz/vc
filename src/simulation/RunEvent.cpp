@@ -288,8 +288,10 @@ void RunEvent::processStaticFailure(Simulation *sim) {
             BlockID gid = it->getBlockID();
 
             // Add block neighbors if the block has slipped
-            if (sim->getUpdateField(gid) > 0) {
-                nbr_start_end = sim->getNeighbors(gid);
+            // Schultz: If you want to check if its failed, then use sim->getFailed(gid)
+            //if (sim->getUpdateField(gid) > 0) {
+            if (sim->getFailed(gid)) {
+                    nbr_start_end = sim->getNeighbors(gid);
 
                 for (nit=nbr_start_end.first; nit!=nbr_start_end.second; ++nit) {
                     loose_elements.insert(*nit);
