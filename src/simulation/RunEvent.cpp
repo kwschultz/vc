@@ -34,15 +34,14 @@ void RunEvent::markBlocks2Fail(Simulation *sim, const FaultID &trigger_fault) {
         gid = sim->getGlobalBID(lid);
 
         // Add this block if it has a static or dynamic CFF failure
-        add = sim->cffFailure(gid) || sim->dynamicFailure(gid, trigger_fault);
+        add = sim->cffFailure(gid); 
         
-        // Sachs allowed "additional failure"?
-//        bool Block::additionalFailure(void) const {
-//        return (state.stressS[0] > 0.0 && (state.cff-state.Fcff)/state.cff > dynamic_val);
-//        }
+        // Allow dynamic failure if the block is "loose" (next to a previously failed block)
+        if (loose_elements.count(gid) > 0) add |= sim->dynamicFailure(gid, trigger_fault);
 
 		// Let each block fail at most 10 times (not per sweep but per event). This is somewhat arbitrary, but it prevents runaway ruptures.
-        if(add && num_failures[gid] < 10) {
+        //if(add && num_failures[gid] < 10) {
+        if (add) {
             num_failures[gid] += 1;
             sim->setFailed(gid, true);
             local_failed_elements.insert(gid);
@@ -66,12 +65,12 @@ void RunEvent::processFailedBlocks(Simulation *sim, quakelib::ModelSweeps &sweep
             // calculate the drop in stress from the failure
 
             // Heien method: 
-            stress_drop = sim->getCFF0(gid) - sim->getCFF(gid);
+            //stress_drop = sim->getCFF0(gid) - sim->getCFF(gid);
             // If this is the initial failure, use the stress drop
-            if (!stress_drop) stress_drop = sim->getStressDrop(gid) - sim->getCFF(gid);
+            //if (!stress_drop) stress_drop = sim->getStressDrop(gid) - sim->getCFF(gid);
 
             // Sachs method:
-            //stress_drop = sim->getStressDrop(gid) - sim->getCFF(gid);
+            stress_drop = sim->getStressDrop(gid) - sim->getCFF(gid);
 
             // Slip is in m
             slip = (stress_drop/sim->getSelfStresses(gid));
@@ -269,11 +268,11 @@ void RunEvent::processStaticFailure(Simulation *sim) {
             sim->setShearStress(gid, 0.0);
             sim->setNormalStress(gid, sim->getRhogd(gid));
             //sim->setUpdateField(gid, (sim->getFailed(gid) ? 0 : std::isnan(sim->getSlipDeficit(gid)) ? 0 :sim->getSlipDeficit(gid) )); // ... also check for nan values
-            //sim->setUpdateField(gid, (sim->getFailed(gid) ? 0 : sim->getSlipDeficit(gid)));
+            sim->setUpdateField(gid, (sim->getFailed(gid) ? 0 : sim->getSlipDeficit(gid)));
             ////////////////
             // Schultz: Cannot reset the slip of failed blocks to zero, you are undoing the slip that occurred in 
             //          ProcessFailedBlocks. ProcessFailedBlocks does our slip counting and we must use those results.
-            sim->setUpdateField(gid, sim->getSlipDeficit(gid));
+            //sim->setUpdateField(gid, sim->getSlipDeficit(gid));
         }
 
         // Distribute the update field values (here it is slip from the sweep) to other processors
@@ -290,7 +289,7 @@ void RunEvent::processStaticFailure(Simulation *sim) {
             // Add block neighbors if the block has slipped
             // Schultz: If you want to check if its failed, then use sim->getFailed(gid)
             //if (sim->getUpdateField(gid) > 0) {
-            if (sim->getFailed(gid)) {
+            if (sim->getUpdateField(gid) == 0) {
                     nbr_start_end = sim->getNeighbors(gid);
 
                 for (nit=nbr_start_end.first; nit!=nbr_start_end.second; ++nit) {
