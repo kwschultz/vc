@@ -22,80 +22,6 @@
 
 
 /*!
- At the end of each sweep after we have recalculated block CFF, we determine
- which blocks will have a failure due to dynamic or static stress changes.
- */
-void RunEvent::markBlocks2Fail(Simulation *sim, const FaultID &trigger_fault) {
-    int         lid;
-    BlockID     gid;
-    bool        add;
-
-    for (lid=0; lid<sim->numLocalBlocks(); ++lid) {
-        gid = sim->getGlobalBID(lid);
-
-        // Add this block if it has a static or dynamic CFF failure
-        add = sim->cffFailure(gid); 
-        
-        // Allow dynamic failure if the block is "loose" (next to a previously failed block)
-        if (loose_elements.count(gid) > 0) add |= sim->dynamicFailure(gid, trigger_fault);
-
-		// Let each block fail at most 10 times (not per sweep but per event). This is somewhat arbitrary, but it prevents runaway ruptures.
-        //if(add && num_failures[gid] < 10) {
-        if (add) {
-            num_failures[gid] += 1;
-            sim->setFailed(gid, true);
-            local_failed_elements.insert(gid);
-        }
-    }
-}
-
-/*!
- Process the list of blocks that failed on this node for this sweep.
- */
-void RunEvent::processFailedBlocks(Simulation *sim, quakelib::ModelSweeps &sweeps) {
-    quakelib::ElementIDSet::iterator    fit;
-    double                              slip, stress_drop;
-
-    // For each block that fails in this sweep, calculate how much it slips
-    for (fit=local_failed_elements.begin(); fit!=local_failed_elements.end(); ++fit) {
-        if (sim->isLocalBlockID(*fit)) {
-            BlockID gid = *fit;
-            Block &b = sim->getBlock(*fit);
-            //
-            // calculate the drop in stress from the failure
-
-            // Heien method: 
-            //stress_drop = sim->getCFF0(gid) - sim->getCFF(gid);
-            // If this is the initial failure, use the stress drop
-            //if (!stress_drop) stress_drop = sim->getStressDrop(gid) - sim->getCFF(gid);
-
-            // Sachs method:
-            stress_drop = sim->getStressDrop(gid) - sim->getCFF(gid);
-
-            // Slip is in m
-            slip = (stress_drop/sim->getSelfStresses(gid));
-
-            if (slip < 0) slip = 0;
-
-            // Record how much the block slipped in this sweep and initial stresses
-            sweeps.setSlipAndArea(sweep_num,
-                                  b.getBlockID(),
-                                  slip,
-                                  b.area(),
-                                  b.lame_mu());
-            sweeps.setInitStresses(sweep_num,
-                                   b.getBlockID(),
-                                   sim->getShearStress(gid),
-                                   sim->getNormalStress(gid));
-
-            // Add the slip from this failure to the current slip deficit
-            sim->setSlipDeficit(gid, sim->getSlipDeficit(gid)+slip);
-        }
-    }
-}
-
-
-/*!
  Process the next aftershock. This involves determining a suitable rupture area from an empirical
  relationship, finding the nearest elements, choosing enough elements to match the empirical
  relationship, calculating the slip needed to generate the aftershock, and updating the stress
@@ -205,6 +131,79 @@ void RunEvent::processAftershock(Simulation *sim) {
 }
 
 
+
+/*!
+ At the end of each sweep after we have recalculated block CFF, we determine
+ which blocks will have a failure due to dynamic or static stress changes.
+ */
+void RunEvent::markBlocks2Fail(Simulation *sim, const FaultID &trigger_fault) {
+    int         lid;
+    BlockID     gid;
+    bool        add;
+
+    for (lid=0; lid<sim->numLocalBlocks(); ++lid) {
+        gid = sim->getGlobalBID(lid);
+
+        // Add this block if it has a static or dynamic CFF failure
+        add = sim->cffFailure(gid); 
+        
+        // Allow dynamic failure if the block is "loose" (next to a previously failed block)
+        if (loose_elements.count(gid) > 0) add |= sim->dynamicFailure(gid, trigger_fault);
+
+		// Let each block fail at most 10 times (not per sweep but per event). This is somewhat arbitrary, but it prevents runaway ruptures.
+        if(add && num_failures[gid] < 20) {
+        //if (add) {
+            num_failures[gid] += 1;
+            sim->setFailed(gid, true);
+            local_failed_elements.insert(gid);
+        }
+    }
+}
+
+/*!
+ Process the list of blocks that failed on this node for this sweep.
+ */
+void RunEvent::processFailedBlocks(Simulation *sim, quakelib::ModelSweeps &sweeps) {
+    quakelib::ElementIDSet::iterator    fit;
+    double                              slip, stress_drop;
+
+    // For each block that fails in this sweep, calculate how much it slips
+    for (fit=local_failed_elements.begin(); fit!=local_failed_elements.end(); ++fit) {
+        BlockID gid = *fit;
+        Block &b = sim->getBlock(*fit);
+        //
+        // calculate the drop in stress from the failure
+
+        // Heien method: 
+        //stress_drop = sim->getCFF0(gid) - sim->getCFF(gid);
+        // If this is the initial failure, use the stress drop
+        //if (!stress_drop) stress_drop = sim->getStressDrop(gid) - sim->getCFF(gid);
+
+        // Sachs method:
+        stress_drop = sim->getStressDrop(gid) - sim->getCFF(gid);
+
+        // Slip is in m
+        slip = (stress_drop/sim->getSelfStresses(gid));
+
+        if (slip < 0) slip = 0;
+
+        // Record how much the block slipped in this sweep and initial stresses
+        sweeps.setSlipAndArea(sweep_num,
+                              b.getBlockID(),
+                              slip,
+                              b.area(),
+                              b.lame_mu());
+        sweeps.setInitStresses(sweep_num,
+                               b.getBlockID(),
+                               sim->getShearStress(gid),
+                               sim->getNormalStress(gid));
+
+        // Add the slip from this failure to the current slip deficit
+        sim->setSlipDeficit(gid, sim->getSlipDeficit(gid)+slip);
+    }
+}
+
+
 /*!
  Given an initial failed block, propagates the failure throughout the system
  by calculating changes in stress and using static and dynamic stress
@@ -265,14 +264,20 @@ void RunEvent::processStaticFailure(Simulation *sim) {
         // Recalculate CFF for all blocks where slipped blocks don't contribute
         for (it=sim->begin(); it!=sim->end(); ++it) {
             BlockID gid = it->getBlockID();
-            sim->setShearStress(gid, 0.0);
-            sim->setNormalStress(gid, sim->getRhogd(gid));
-            //sim->setUpdateField(gid, (sim->getFailed(gid) ? 0 : std::isnan(sim->getSlipDeficit(gid)) ? 0 :sim->getSlipDeficit(gid) )); // ... also check for nan values
-            sim->setUpdateField(gid, (sim->getFailed(gid) ? 0 : sim->getSlipDeficit(gid)));
-            ////////////////
-            // Schultz: Cannot reset the slip of failed blocks to zero, you are undoing the slip that occurred in 
-            //          ProcessFailedBlocks. ProcessFailedBlocks does our slip counting and we must use those results.
-            //sim->setUpdateField(gid, sim->getSlipDeficit(gid));
+            
+            ///// Schultz: Does this need an sim->isLocalBlockID(gid) check?
+            // We are distributing the update field after this so I think this should
+            // only operate on local blocks.
+            if (sim->isLocalBlockID(gid)) {            
+                sim->setShearStress(gid, 0.0);
+                sim->setNormalStress(gid, sim->getRhogd(gid));
+                //sim->setUpdateField(gid, (sim->getFailed(gid) ? 0 : std::isnan(sim->getSlipDeficit(gid)) ? 0 :sim->getSlipDeficit(gid) )); // ... also check for nan values
+                //sim->setUpdateField(gid, (sim->getFailed(gid) ? 0 : sim->getSlipDeficit(gid)));
+                ////////////////
+                // Schultz: Cannot reset the slip of failed blocks to zero, you are undoing the slip that occurred in 
+                //          ProcessFailedBlocks. ProcessFailedBlocks does our slip counting and we must use those results.
+                sim->setUpdateField(gid, sim->getSlipDeficit(gid));
+            }
         }
 
         // Distribute the update field values (here it is slip from the sweep) to other processors
@@ -289,7 +294,7 @@ void RunEvent::processStaticFailure(Simulation *sim) {
             // Add block neighbors if the block has slipped
             // Schultz: If you want to check if its failed, then use sim->getFailed(gid)
             //if (sim->getUpdateField(gid) > 0) {
-            if (sim->getUpdateField(gid) == 0) {
+            if (sim->getFailed(gid)) {
                     nbr_start_end = sim->getNeighbors(gid);
 
                 for (nit=nbr_start_end.first; nit!=nbr_start_end.second; ++nit) {
@@ -395,7 +400,7 @@ SimRequest RunEvent::run(SimFramework *_sim) {
     // add some barrier() blocking (which might have been added above to barrier()-wrap the process_{earthquake type}() call).
     recordEventStresses(sim);
 
-    // Update the cumulative slip for this fault
+    // Reset the local blocks to not failed
     for (lid=0; lid<sim->numLocalBlocks(); ++lid) {
         BlockID gid = sim->getGlobalBID(lid);
         sim->setFailed(gid, false);
